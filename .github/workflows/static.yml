@@ -36,7 +36,7 @@ jobs:
       - name: install node
         uses: actions/setup-node@v6
         with:
-          node_version: '24.x'
+          node-version: '24.x'
       - name: install pnpm
         uses: pnpm/action-setup@v4
       - run: pnpm i
