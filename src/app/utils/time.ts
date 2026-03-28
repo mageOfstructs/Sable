@@ -1,39 +1,45 @@
 import dayjs from 'dayjs';
 import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 
 dayjs.extend(isToday);
 dayjs.extend(isYesterday);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
-export const today = (ts: number): boolean => dayjs(ts).isToday();
+export const setTz = (tz: string): void => dayjs.tz.setDefault(tz);
 
-export const yesterday = (ts: number): boolean => dayjs(ts).isYesterday();
+export const today = (ts: number): boolean => dayjs.tz(ts).isToday();
+
+export const yesterday = (ts: number): boolean => dayjs.tz(ts).isYesterday();
 
 export const timeHour = (ts: number, hour24Clock: boolean): string =>
-  dayjs(ts).format(hour24Clock ? 'HH' : 'hh');
-export const timeMinute = (ts: number): string => dayjs(ts).format('mm');
-export const timeAmPm = (ts: number): string => dayjs(ts).format('A');
-export const timeDay = (ts: number): string => dayjs(ts).format('D');
-export const timeMon = (ts: number): string => dayjs(ts).format('MMM');
-export const timeMonth = (ts: number): string => dayjs(ts).format('MMMM');
-export const timeYear = (ts: number): string => dayjs(ts).format('YYYY');
+  dayjs.tz(ts).format(hour24Clock ? 'HH' : 'hh');
+export const timeMinute = (ts: number): string => dayjs.tz(ts).format('mm');
+export const timeAmPm = (ts: number): string => dayjs.tz(ts).format('A');
+export const timeDay = (ts: number): string => dayjs.tz(ts).format('D');
+export const timeMon = (ts: number): string => dayjs.tz(ts).format('MMM');
+export const timeMonth = (ts: number): string => dayjs.tz(ts).format('MMMM');
+export const timeYear = (ts: number): string => dayjs.tz(ts).format('YYYY');
 
 export const timeHourMinute = (ts: number, hour24Clock: boolean): string =>
-  dayjs(ts).format(hour24Clock ? 'HH:mm' : 'hh:mm A');
+  dayjs.tz(ts).format(hour24Clock ? 'HH:mm' : 'hh:mm A');
 
 export const timeHourMinuteSecond = (ts: number, hour24Clock: boolean): string =>
-  dayjs(ts).format(hour24Clock ? 'HH:mm:ss' : 'hh:mm:ss A');
+  dayjs.tz(ts).format(hour24Clock ? 'HH:mm:ss' : 'hh:mm:ss A');
 
 export const timeDayMonYear = (ts: number, dateFormatString: string): string =>
-  dayjs(ts).format(dateFormatString);
+  dayjs.tz(ts).format(dateFormatString);
 
-export const timeDayMonthYear = (ts: number): string => dayjs(ts).format('D MMMM YYYY');
+export const timeDayMonthYear = (ts: number): string => dayjs.tz(ts).format('D MMMM YYYY');
 
 export const daysInMonth = (month: number, year: number): number =>
-  dayjs(`${year}-${month}-1`).daysInMonth();
+  dayjs.tz(`${year}-${month}-1`).daysInMonth();
 
 export const dateFor = (year: number, month: number, day: number): number =>
-  dayjs(`${year}-${month}-${day}`).valueOf();
+  dayjs.tz(`${year}-${month}-${day}`).valueOf();
 
 export const inSameDay = (ts1: number, ts2: number): boolean => {
   const dt1 = new Date(ts1);
@@ -77,12 +83,12 @@ export const daysToMs = (days: number) => days * hoursToMs(24);
 
 export const getToday = () => {
   const nowTs = Date.now();
-  const date = dayjs(nowTs);
+  const date = dayjs.tz(nowTs);
   return dateFor(date.year(), date.month() + 1, date.date());
 };
 
 export const getYesterday = () => {
   const nowTs = Date.now() - daysToMs(1);
-  const date = dayjs(nowTs);
+  const date = dayjs.tz(nowTs);
   return dateFor(date.year(), date.month() + 1, date.date());
 };

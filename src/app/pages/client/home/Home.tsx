@@ -15,6 +15,7 @@ import {
   config,
   toRem,
 } from 'folds';
+import { setTz } from '$utils/time';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAtom, useAtomValue } from 'jotai';
 import FocusTrap from 'focus-trap-react';
@@ -62,6 +63,7 @@ import { UseStateProvider } from '$components/UseStateProvider';
 import { JoinAddressPrompt } from '$components/join-address-prompt';
 import { RoomSearchParams } from '$pages/paths';
 import { useHomeRooms } from './useHomeRooms';
+import { useTimezoneConfigure } from '$hooks/useTimezoneFetch';
 
 type HomeMenuProps = {
   requestClose: () => void;
@@ -193,7 +195,9 @@ function HomeEmpty() {
 const DEFAULT_CATEGORY_ID = makeNavCategoryId('home', 'room');
 export function Home() {
   const mx = useMatrixClient();
+
   useNavToActivePathMapper('home');
+  useTimezoneConfigure(mx);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rooms = useHomeRooms();
   const notificationPreferences = useRoomsNotificationPreferencesContext();

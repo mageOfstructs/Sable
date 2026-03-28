@@ -53,6 +53,7 @@ import { BioEditor } from './BioEditor';
 import { NameColorEditor } from './NameColorEditor';
 import { StatusEditor } from './StatusEditor';
 import { AnimalCosmetics } from './AnimalCosmetics';
+import { setTz } from '$utils/time';
 
 type PronounSet = {
   summary: string;
@@ -566,6 +567,7 @@ function ProfileExtended({ profile, userId }: Readonly<ProfileProps>) {
           onSave={(tz) => {
             handleSaveField('us.cloke.msc4175.tz', tz);
             handleSaveField('m.tz', tz);
+            setTz(tz);
           }}
         />
       </SequenceCard>
