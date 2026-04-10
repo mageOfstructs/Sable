@@ -118,6 +118,14 @@ type SessionInfo = {
  */
 const sessions = new Map<string, SessionInfo>();
 
+/**
+ * Session pre-loaded from cache on SW activation. Acts as an immediate
+ * fallback so media fetches don't 401 during the window between SW restart
+ * and the first live setSession message from the page.
+ * Cleared as soon as any real setSession call comes in.
+ */
+let preloadedSession: SessionInfo | undefined;
+
 const clientToResolve = new Map<string, (value: SessionInfo | undefined) => void>();
 const clientToSessionPromise = new Map<string, Promise<SessionInfo | undefined>>();
 
@@ -142,12 +150,15 @@ function setSession(clientId: string, accessToken: unknown, baseUrl: unknown, us
       userId: typeof userId === 'string' ? userId : undefined,
     };
     sessions.set(clientId, info);
+    // A real session has arrived — discard the preloaded fallback.
+    preloadedSession = undefined;
     console.debug('[SW] setSession: stored', clientId, baseUrl);
     // Persist so push-event fetches work after iOS restarts the SW.
     persistSession(info).catch(() => undefined);
   } else {
     // Logout or invalid session
     sessions.delete(clientId);
+    preloadedSession = undefined;
     console.debug('[SW] setSession: removed', clientId);
     clearPersistedSession().catch(() => undefined);
   }
@@ -266,26 +277,71 @@ async function fetchRoomName(
   }
 }
 
+type MemberInfo = {
+  displayname: string | undefined;
+  avatarUrl: string | undefined;
+};
+
 /**
- * Fetch a room member's displayname from homeserver member state.
- * Returns undefined if the member has no displayname or the request fails.
+ * Fetch a room member's state from the homeserver.
+ * Returns displayname and avatar_url (both may be undefined).
  */
-async function fetchMemberDisplayName(
+async function fetchMemberInfo(
   baseUrl: string,
   accessToken: string,
   roomId: string,
   userId: string
-): Promise<string | undefined> {
+): Promise<MemberInfo> {
   try {
     const url = `${baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.member/${encodeURIComponent(userId)}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) return { displayname: undefined, avatarUrl: undefined };
+    const data = (await res.json()) as Record<string, unknown>;
+    const displayname =
+      typeof data.displayname === 'string' && data.displayname.trim()
+        ? data.displayname.trim()
+        : undefined;
+    const avatarUrl =
+      typeof data.avatar_url === 'string' && data.avatar_url.trim()
+        ? data.avatar_url.trim()
+        : undefined;
+    return { displayname, avatarUrl };
+  } catch {
+    return { displayname: undefined, avatarUrl: undefined };
+  }
+}
+
+/**
+ * Fetch the m.room.avatar state event URL from the homeserver.
+ * Returns undefined when the room has no avatar or the request fails.
+ */
+async function fetchRoomAvatar(
+  baseUrl: string,
+  accessToken: string,
+  roomId: string
+): Promise<string | undefined> {
+  try {
+    const url = `${baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.avatar`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (!res.ok) return undefined;
     const data = (await res.json()) as Record<string, unknown>;
-    const name = data.displayname;
-    return typeof name === 'string' && name.trim() ? name.trim() : undefined;
+    const avatarUrl = data.url;
+    return typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : undefined;
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Convert an mxc:// URL to a legacy unauthenticated thumbnail URL.
+ * Notification icons are fetched by the OS without auth headers, so we use
+ * the pre-MSC3916 media endpoint which most homeservers still serve publicly.
+ */
+function mxcToNotificationUrl(mxcUrl: string, baseUrl: string): string | undefined {
+  const match = mxcUrl.match(/^mxc:\/\/([^/]+)\/([^?#]+)/);
+  if (!match) return undefined;
+  const [, server, mediaId] = match;
+  return `${baseUrl}/_matrix/media/v3/thumbnail/${encodeURIComponent(server)}/${encodeURIComponent(mediaId)}?width=96&height=96&method=crop`;
 }
 
 /**
@@ -366,8 +422,8 @@ async function handleMinimalPushPayload(
     console.debug('[SW push] minimal payload: no session, showing generic notification');
     await self.registration.showNotification('New Message', {
       body: undefined,
-      icon: '/public/res/apple/apple-touch-icon-180x180.png',
-      badge: '/public/res/apple/apple-touch-icon-72x72.png',
+      icon: '/public/res/logo-maskable/cinny-logo-maskable-180x180.png',
+      badge: '/public/res/logo-maskable/cinny-logo-maskable-72x72.png',
       tag: `room-${roomId}`,
       renotify: true,
       data: { room_id: roomId, event_id: eventId },
@@ -375,17 +431,18 @@ async function handleMinimalPushPayload(
     return;
   }
 
-  // Fetch the raw event and room name state in parallel — both need only roomId.
-  const [rawEvent, roomNameFromState] = await Promise.all([
+  // Fetch the raw event, room name, and room avatar in parallel — all need only roomId.
+  const [rawEvent, roomNameFromState, roomAvatarMxc] = await Promise.all([
     fetchRawEvent(session.baseUrl, session.accessToken, roomId, eventId),
     fetchRoomName(session.baseUrl, session.accessToken, roomId),
+    fetchRoomAvatar(session.baseUrl, session.accessToken, roomId),
   ]);
 
   if (!rawEvent) {
     await self.registration.showNotification('New Message', {
       body: undefined,
-      icon: '/public/res/apple/apple-touch-icon-180x180.png',
-      badge: '/public/res/apple/apple-touch-icon-72x72.png',
+      icon: '/public/res/logo-maskable/cinny-logo-maskable-180x180.png',
+      badge: '/public/res/logo-maskable/cinny-logo-maskable-72x72.png',
       tag: `room-${roomId}`,
       renotify: true,
       data: { room_id: roomId, event_id: eventId, user_id: session.userId },
@@ -395,13 +452,20 @@ async function handleMinimalPushPayload(
 
   const eventType = rawEvent.type as string | undefined;
   const sender = rawEvent.sender as string | undefined;
-  // Fetch sender's display name from room member state; fall back to MXID localpart.
-  const senderDisplay =
-    (sender
-      ? await fetchMemberDisplayName(session.baseUrl, session.accessToken, roomId, sender)
-      : undefined) ?? (sender ? mxidLocalpart(sender) : 'Someone');
+  // Fetch sender's member state — gives us both display name and avatar URL.
+  const memberInfo = sender
+    ? await fetchMemberInfo(session.baseUrl, session.accessToken, roomId, sender)
+    : { displayname: undefined, avatarUrl: undefined };
+  // Fall back to MXID localpart when the server returns no displayname.
+  const senderDisplay = memberInfo.displayname ?? (sender ? mxidLocalpart(sender) : 'Someone');
   // For DMs (no m.room.name state), use the sender's display name as the room name.
   const resolvedRoomName = roomNameFromState ?? senderDisplay;
+  // Room avatar takes priority (group rooms); for DMs fall back to sender's member avatar.
+  // Convert mxc:// to a legacy unauthenticated thumbnail URL so the OS can fetch it.
+  const notificationAvatarUrl =
+    (roomAvatarMxc ?? memberInfo.avatarUrl) !== undefined
+      ? mxcToNotificationUrl((roomAvatarMxc ?? memberInfo.avatarUrl)!, session.baseUrl)
+      : undefined;
   const baseData = {
     room_id: roomId,
     event_id: eventId,
@@ -421,13 +485,16 @@ async function handleMinimalPushPayload(
 
     if (result?.success) {
       // App was backgrounded but not frozen — decryption succeeded.
+      // Prefer the server-fetched display name (authoritative) over the relay's SDK cache
+      // value, which may be stale or missing if the SDK hasn't fully synced yet.
       await handlePushNotificationPushData({
         ...baseData,
         type: result.eventType,
         content: result.content,
-        sender_display_name: result.sender_display_name ?? senderDisplay,
+        sender_display_name: senderDisplay,
         // Prefer relay's room name (has m.direct / computed SDK name); fall back to state fetch.
         room_name: result.room_name || resolvedRoomName,
+        room_avatar_url: notificationAvatarUrl,
       });
     } else {
       // App is frozen or fully closed — show "Encrypted message" fallback.
@@ -437,6 +504,7 @@ async function handleMinimalPushPayload(
         content: {},
         sender_display_name: senderDisplay,
         room_name: resolvedRoomName,
+        room_avatar_url: notificationAvatarUrl,
       });
     }
   } else {
@@ -447,6 +515,7 @@ async function handleMinimalPushPayload(
       content: rawEvent.content,
       sender_display_name: senderDisplay,
       room_name: resolvedRoomName,
+      room_avatar_url: notificationAvatarUrl,
     });
   }
 }
@@ -460,6 +529,15 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
     (async () => {
       await self.clients.claim();
       await cleanupDeadClients();
+      // Pre-load the persisted session into memory so that media fetches arriving
+      // before the first setSession message from the page are immediately
+      // authenticated rather than falling through to a 3-second timeout.
+      preloadedSession = await loadPersistedSession();
+      // Proactively request sessions from all window clients so the sessions Map
+      // is pre-populated after a SW restart, rather than waiting for the first
+      // media fetch to trigger requestSessionWithTimeout.
+      const windowClients = await self.clients.matchAll({ type: 'window' });
+      windowClients.forEach((client) => client.postMessage({ type: 'requestSession' }));
     })()
   );
 });
@@ -579,7 +657,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
   if (method !== 'GET' || !mediaPath(url)) return;
 
   const { clientId } = event;
-  if (!clientId) return;
 
   // For browser sub-resource loads (images, video, audio, etc.), 'follow' is
   // the correct mode: the auth header is sent to the Matrix server which owns
@@ -588,11 +665,9 @@ self.addEventListener('fetch', (event: FetchEvent) => {
   // the browser cannot render as an <img>/<video>/etc.
   const redirect: RequestRedirect = 'follow';
 
-  const session = sessions.get(clientId);
-  if (session) {
-    if (validMediaRequest(url, session.baseUrl)) {
-      event.respondWith(fetch(url, { ...fetchConfig(session.accessToken), redirect }));
-    }
+  const session = clientId ? sessions.get(clientId) : undefined;
+  if (session && validMediaRequest(url, session.baseUrl)) {
+    event.respondWith(fetch(url, { ...fetchConfig(session.accessToken), redirect }));
     return;
   }
 
@@ -604,16 +679,43 @@ self.addEventListener('fetch', (event: FetchEvent) => {
   // as the wrong one.
   // Thus any logic in the future which cares about which user is authenticating the request
   // might break this. Also, again, it is technically wrong.
-  const byBaseUrl = [...sessions.values()].find((s) => validMediaRequest(url, s.baseUrl));
+  // Also checks preloadedSession — populated from cache at SW activate — for the window
+  // between SW restart and the first live setSession arriving from the page.
+  const byBaseUrl =
+    [...sessions.values()].find((s) => validMediaRequest(url, s.baseUrl)) ??
+    (preloadedSession && validMediaRequest(url, preloadedSession.baseUrl)
+      ? preloadedSession
+      : undefined);
   if (byBaseUrl) {
     event.respondWith(fetch(url, { ...fetchConfig(byBaseUrl.accessToken), redirect }));
     return;
   }
 
+  // No clientId: the fetch came from a context not associated with a specific
+  // window (e.g. a prerender). Fall back to the persisted session directly.
+  if (!clientId) {
+    event.respondWith(
+      loadPersistedSession().then((persisted) => {
+        if (persisted && validMediaRequest(url, persisted.baseUrl)) {
+          return fetch(url, { ...fetchConfig(persisted.accessToken), redirect });
+        }
+        return fetch(event.request);
+      })
+    );
+    return;
+  }
+
   event.respondWith(
-    requestSessionWithTimeout(clientId).then((s) => {
+    requestSessionWithTimeout(clientId).then(async (s) => {
+      // Primary: session received from the live client window.
       if (s && validMediaRequest(url, s.baseUrl)) {
         return fetch(url, { ...fetchConfig(s.accessToken), redirect });
+      }
+      // Fallback: try the persisted session (helps when SW restarts on iOS and
+      // the client window hasn't responded to requestSession yet).
+      const persisted = await loadPersistedSession();
+      if (persisted && validMediaRequest(url, persisted.baseUrl)) {
+        return fetch(url, { ...fetchConfig(persisted.accessToken), redirect });
       }
       console.warn(
         '[SW fetch] No valid session for media request',

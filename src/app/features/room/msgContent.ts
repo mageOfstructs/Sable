@@ -59,8 +59,6 @@ export const getImageMsgContent = async (
     msgtype: MsgType.Image,
     filename: file.name,
     body: file.name,
-    format: 'org.matrix.custom.html',
-    formatted_body: file.name,
     [MATRIX_SPOILER_PROPERTY_NAME]: metadata.markedAsSpoiler,
   };
   if (imgEl) {
@@ -101,8 +99,6 @@ export const getVideoMsgContent = async (
     msgtype: MsgType.Video,
     filename: file.name,
     body: file.name,
-    format: 'org.matrix.custom.html',
-    formatted_body: file.name,
     [MATRIX_SPOILER_PROPERTY_NAME]: metadata.markedAsSpoiler,
   };
   if (videoEl) {
@@ -151,12 +147,12 @@ export type AudioMsgContent = IContent & {
 export const getAudioMsgContent = (item: TUploadItem, mxc: string): AudioMsgContent => {
   const { file, encInfo, metadata } = item;
   const { waveform, audioDuration, markedAsSpoiler } = metadata;
+  const isVoice = waveform !== undefined && waveform.length > 0;
+  const fallbackBody = isVoice ? 'a voice message' : file.name;
   let content: IContent = {
     msgtype: MsgType.Audio,
     filename: file.name,
-    body: item.body && item.body.length > 0 ? item.body : 'a voice message',
-    format: 'org.matrix.custom.html',
-    formatted_body: item.body && item.body.length > 0 ? item.body : '<em>a voice message</em>',
+    body: item.body && item.body.length > 0 ? item.body : fallbackBody,
     info: {
       mimetype: file.type,
       size: file.size,
@@ -168,7 +164,7 @@ export const getAudioMsgContent = (item: TUploadItem, mxc: string): AudioMsgCont
       waveform: waveform?.map((v) => Math.round(v * 1024)),
       duration: markedAsSpoiler || !audioDuration ? 0 : audioDuration * 1000,
     },
-    'org.matrix.msc1767.text': item.body && item.body.length > 0 ? item.body : 'a voice message',
+    'org.matrix.msc1767.text': item.body && item.body.length > 0 ? item.body : fallbackBody,
     'org.matrix.msc3245.voice.v2': {
       duration: markedAsSpoiler || !audioDuration ? 0 : audioDuration,
       waveform: waveform?.map((v) => Math.round(v * 1024)),
@@ -220,8 +216,6 @@ export const getFileMsgContent = (item: TUploadItem, mxc: string): IContent => {
     msgtype: MsgType.File,
     filename: file.name,
     body: file.name,
-    format: 'org.matrix.custom.html',
-    formatted_body: file.name,
     info: {
       mimetype: file.type,
       size: file.size,

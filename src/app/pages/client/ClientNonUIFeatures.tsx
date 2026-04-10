@@ -14,7 +14,7 @@ import parse from 'html-react-parser';
 import { getReactCustomHtmlParser, LINKIFY_OPTS } from '$plugins/react-custom-html-parser';
 import { sanitizeCustomHtml } from '$utils/sanitize';
 import { roomToUnreadAtom } from '$state/room/roomToUnread';
-import LogoSVG from '$public/res/svg/cinny.svg';
+import LogoSVG from '$public/res/svg/cinny-logo.svg';
 import LogoUnreadSVG from '$public/res/svg/cinny-unread.svg';
 import LogoHighlightSVG from '$public/res/svg/cinny-highlight.svg';
 import NotificationSound from '$public/sound/notification.ogg';
@@ -39,6 +39,7 @@ import { getMxIdLocalPart, mxcUrlToHttp } from '$utils/matrix';
 import { useSelectedRoom } from '$hooks/router/useSelectedRoom';
 import { useInboxNotificationsSelected } from '$hooks/router/useInbox';
 import { useMediaAuthentication } from '$hooks/useMediaAuthentication';
+import { useSettingsLinkBaseUrl } from '$features/settings/useSettingsLinkBaseUrl';
 import { registrationAtom } from '$state/serviceWorkerRegistration';
 import { pendingNotificationAtom, inAppBannerAtom, activeSessionIdAtom } from '$state/sessions';
 import {
@@ -54,6 +55,7 @@ import { TelemetryConsentBanner } from '$components/telemetry-consent';
 import { useCallSignaling } from '$hooks/useCallSignaling';
 import { getBlobCacheStats } from '$hooks/useBlobCache';
 import { lastVisitedRoomIdAtom } from '$state/room/lastRoom';
+import { useSettingsSyncEffect } from '$hooks/useSettingsSync';
 import { getInboxInvitesPath } from '../pathUtils';
 import { BackgroundNotifications } from './BackgroundNotifications';
 
@@ -241,6 +243,7 @@ function MessageNotifications() {
   const clientStartTimeRef = useRef(Date.now());
   const mx = useMatrixClient();
   const useAuthentication = useMediaAuthentication();
+  const appBaseUrl = useSettingsLinkBaseUrl();
   const [showNotifications] = useSetting(settingsAtom, 'useInAppNotifications');
   const [showSystemNotifications] = useSetting(settingsAtom, 'useSystemNotifications');
   const [usePushNotifications] = useSetting(settingsAtom, 'usePushNotifications');
@@ -473,6 +476,7 @@ function MessageNotifications() {
           content.formatted_body
         ) {
           const htmlParserOpts = getReactCustomHtmlParser(mx, room.roomId, {
+            settingsLinkBaseUrl: appBaseUrl,
             linkifyOpts: LINKIFY_OPTS,
             useAuthentication,
             nicknames: nicknamesRef.current,
@@ -531,6 +535,7 @@ function MessageNotifications() {
     setInAppBanner,
     setPending,
     selectedRoomId,
+    appBaseUrl,
     useAuthentication,
   ]);
 
@@ -835,10 +840,16 @@ function PresenceFeature() {
   return null;
 }
 
+function SettingsSyncFeature() {
+  useSettingsSyncEffect();
+  return null;
+}
+
 export function ClientNonUIFeatures({ children }: ClientNonUIFeaturesProps) {
   useCallSignaling();
   return (
     <>
+      <SettingsSyncFeature />
       <SystemEmojiFeature />
       <PageZoomFeature />
       <PrivacyBlurFeature />

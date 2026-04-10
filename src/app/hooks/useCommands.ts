@@ -32,6 +32,7 @@ import { useOpenBugReportModal } from '$state/hooks/bugReportModal';
 import { createRoomEncryptionState } from '$components/create-room';
 import { parsePronounsInput } from '$utils/pronouns';
 import { sendFeedback } from '$utils/sendFeedbackToUser';
+import { PKitCommandMessageHandler } from '$plugins/pluralkit-handler/PKitCommandMessageHandler';
 import { useRoomNavigate } from './useRoomNavigate';
 import { enrichWidgetUrl } from './useRoomWidgets';
 import { useUserProfile } from './useUserProfile';
@@ -49,6 +50,9 @@ export const UNFLIP = '┬─┬ノ( º_ºノ)';
 const FLAG_PAT = String.raw`(?:^|\s)-(\w+)\b`;
 const FLAG_REG = new RegExp(FLAG_PAT);
 const FLAG_REG_G = new RegExp(FLAG_PAT, 'g');
+
+const ADDPMP_REGEX = /(\S+) (name=)?"?([\w\s]*)"? (avatar=)?([\w.:/]+)/;
+const USEPMP_REGEX = /^(\S+)\s*(-g)?(-o)?(-u)?\s*(\d+)?$/;
 
 export const splitPayloadContentAndFlags = (payload: string): [string, string | undefined] => {
   const flagMatch = new RegExp(FLAG_REG).exec(payload);
@@ -233,6 +237,7 @@ export enum Command {
   Delete = 'delete',
   Acl = 'acl',
   // Sable commands
+  Knock = 'knock',
   Color = 'color',
   SColor = 'scolor',
   Font = 'font',
@@ -241,6 +246,7 @@ export enum Command {
   AddPerMessageProfileToAccount = 'addpmp',
   DeletePerMessageProfileFromAccount = 'delpmp',
   UsePerMessageProfile = 'usepmp',
+  AssociateProxyPerMessageProfile = 'pmpproxy',
   Pronoun = 'pronoun',
   SPronoun = 'spronoun',
   Rainbow = 'rainbow',
@@ -251,6 +257,7 @@ export enum Command {
   SetExt = 'setext',
   DelExt = 'delext',
   DiscardSession = 'discardsession',
+  Html = 'html',
   // Cute Events
   Hug = 'hug',
   Cuddle = 'cuddle',
@@ -262,6 +269,9 @@ export enum Command {
   Report = 'bugreport',
   // Experimental
   ShareE2EEHistory = 'sharehistory',
+  // Spec missing from cinny
+  Location = 'location',
+  ShareMyLocation = 'sharemylocation',
 }
 
 export type CommandContent = {
@@ -276,6 +286,8 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
   const { navigateRoom } = useRoomNavigate();
   const [developerTools] = useSetting(settingsAtom, 'developerTools');
   const [enableMSC4268CMD] = useSetting(settingsAtom, 'enableMSC4268CMD');
+  // helper for pkit commands
+  const pkitcmdHandler = useMemo(() => new PKitCommandMessageHandler(mx, room), [mx, room]);
   const profile = useUserProfile(mx.getSafeUserId());
   const openBugReport = useOpenBugReportModal();
 
@@ -489,26 +501,19 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
           'Add or update a per message profile to your account. Example: /addpmp profileId name=Profile Name avatar=mxc://xyzabc',
         exe: async (payload) => {
           // Parse key=value pairs
-          const parts = payload.split(' ');
-          let avatarUrl: string | undefined;
-          let name: string | undefined;
-          parts.forEach((part, index) => {
-            const [key, value] = part.split('=');
-            if (key && value) {
-              if (key === 'name' || key === 'avatar') {
-                if (key === 'name') {
-                  name = parts
-                    .slice(index)
-                    .map((p) => p.split('=')[1])
-                    .join(' ');
-                  return;
-                }
-                if (key === 'avatar') avatarUrl = value;
-              }
-            }
-          });
+          const args = ADDPMP_REGEX.exec(payload);
+          if (!args) {
+            sendFeedback(`invalid payload`, room, mx.getSafeUserId());
+            return;
+          }
+          const avatarUrl: string | undefined = args[5];
+          const name: string | undefined = args[3];
+          const profileId = args[1];
 
-          const profileId = parts[0]; // profileId is positional (before any key=)
+          if (!avatarUrl || !name || !profileId) {
+            sendFeedback(`invalid payload`, room, mx.getSafeUserId());
+            return;
+          }
 
           const pmp: PerMessageProfile = {
             id: profileId,
@@ -562,13 +567,28 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
       [Command.UsePerMessageProfile]: {
         name: Command.UsePerMessageProfile,
         description:
-          'Use a per message profile for this room once, or until reset. Example: /usepmp profileId [once,reset,or duration like 1h30m]',
+          'Use a per message profile for this room once, or until reset. Example: /usepmp (profileId,reset) [-o,-u,-g] [ts]',
         exe: async (payload) => {
-          // this command doesn't need to do anything, the composer will pick it up and apply the profile to the message being composed
-          const profileId: string = splitWithSpace(payload)[0];
-          const durationStr: string | undefined = splitWithSpace(payload)[1];
-          let validUntil: number | undefined;
-          if (durationStr === 'reset') {
+          const args = USEPMP_REGEX.exec(payload);
+          if (!args) {
+            sendFeedback(`invalid payload`, room, mx.getSafeUserId());
+            return;
+          }
+          const profileId = args[1];
+          const globalFlag = args[2] !== undefined;
+          const onceFlag = args[3] !== undefined;
+          // const untilFlag = args[4] !== undefined;
+          const validUntil = Number.parseInt(args[5], 10);
+          if (onceFlag || globalFlag) {
+            sendFeedback(
+              'Currently not implemented, consider using shorthands, with /pmpproxy id ✨:text',
+              room,
+              mx.getSafeUserId()
+            );
+            return;
+          }
+
+          if (profileId.normalize() === 'reset') {
             setCurrentlyUsedPerMessageProfileIdForRoom(mx, room.roomId, undefined, undefined, true)
               .then(() => {
                 sendFeedback('Per message profile reset for this room.', room, mx.getSafeUserId());
@@ -586,7 +606,7 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
             .then(() => {
               sendFeedback(
                 `Per message profile "${profileId}" will be used for messages in this room for the until ${
-                  durationStr ?? 'reset'
+                  validUntil ?? 'reset'
                 }. Use \`/usepmp reset\` to reset it at any time.`,
                 room,
                 mx.getSafeUserId()
@@ -599,6 +619,15 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
                 mx.getSafeUserId()
               );
             });
+        },
+      },
+      [Command.AssociateProxyPerMessageProfile]: {
+        name: Command.AssociateProxyPerMessageProfile,
+        description: 'Associate proxy with a profile. Example /pmpproxy id ✨:text',
+        exe: async (payload) => {
+          const pid: string = splitWithSpace(payload)[0];
+          const proxy: string = splitWithSpace(payload)[1];
+          pkitcmdHandler.handleMessage(`pk;member "${pid}" proxy ${proxy}`, true);
         },
       },
       [Command.MyRoomAvatar]: {
@@ -763,6 +792,20 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
         },
       },
       // Sable commands
+      [Command.Knock]: {
+        name: Command.Knock,
+        description:
+          'Knock on (request to join) room with address. Example: /knock address1 address2',
+        exe: async (payload) => {
+          const rawIds = splitWithSpace(payload);
+          const roomIdOrAliases = rawIds.filter(
+            (idOrAlias) => isRoomId(idOrAlias) || isRoomAlias(idOrAlias)
+          );
+          roomIdOrAliases.forEach(async (idOrAlias) => {
+            await mx.knockRoom(idOrAlias);
+          });
+        },
+      },
       [Command.Color]: {
         name: Command.Color,
         description: 'Set a room-specific color. Example: /color #ff00ff | /color reset',
@@ -1305,6 +1348,26 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
           }
         },
       },
+      [Command.Html]: {
+        name: Command.Html,
+        description:
+          'Send a message with HTML content. Example: /html <span data-mx-color="#ff0000">Red</span>',
+        exe: async (payload) => {
+          await mx.sendMessage(room.roomId, {
+            msgtype: MsgType.Text,
+            body: payload
+              .replaceAll('<br>', '\n')
+              .replaceAll('<li>', '\n- ')
+              .replaceAll(
+                /<a(.*?)href="(?<link>(.*?))"(.*?)>(?<text>(.*?))<\/a>/g,
+                '[$<text>]($<link>)'
+              )
+              .replaceAll(/<[^>]*>/g, ''),
+            format: 'org.matrix.custom.html',
+            formatted_body: payload,
+          });
+        },
+      },
       // Sharing E2EE History of a room with a user
       [Command.ShareE2EEHistory]: {
         name: Command.ShareE2EEHistory,
@@ -1430,6 +1493,82 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
           openBugReport();
         },
       },
+      [Command.Location]: {
+        name: Command.Location,
+        description: 'Share a location as /location <latitude> <longitude>',
+        exe: async (payload) => {
+          const target = payload
+            .replace(',', ' ')
+            .replace('/', ' ')
+            .replace('  ', ' ')
+            .trim()
+            .split(' ');
+
+          const mlat = target[0];
+          const mlon = target[1];
+          const malt = target[2];
+          if (!mlat || !mlat) {
+            sendFeedback(
+              'You need to specify a latitude, a longitude parameter, and optionally an altitude, as for example: /location 43.959971 -59.790623 or use the /sharemylocation to share the current location',
+              room,
+              mx.getSafeUserId()
+            );
+            return;
+          }
+          await mx.sendMessage(room.roomId, {
+            msgtype: 'm.location',
+            geo_uri: `geo:${mlat},${mlon}${malt ? `,${malt}` : ''};u=0`,
+            body: `https://www.openstreetmap.org/?mlat=${mlat}&mlon=${mlon}#map=16/${mlat}/${mlon}"`,
+          } as any);
+        },
+      },
+      [Command.ShareMyLocation]: {
+        name: Command.ShareMyLocation,
+        description:
+          'Share current location. Requires your browser to have location permissions. Add the flag --accurate or -a for enabling the high accuracy option',
+        exe: async (payload) => {
+          const target = payload.trim();
+          const options = {
+            enableHighAccuracy:
+              target === '--accurate' ||
+              target === '-a' ||
+              target === '--high-accuracy' ||
+              target === '-h',
+            timeout: 5000,
+            maximumAge: 0,
+          };
+          function success(pos: any) {
+            const crd = pos.coords;
+
+            const mlat = crd.latitude;
+            const mlon = crd.longitude;
+            const malt = crd.altitude;
+            const macc = crd.accuracy;
+            if (!mlat || !mlat) {
+              sendFeedback(
+                'Unable to retrieve the location data for an unknown reason',
+                room,
+                mx.getSafeUserId()
+              );
+              return;
+            }
+            mx.sendMessage(room.roomId, {
+              msgtype: 'm.location',
+              geo_uri: `geo:${mlat},${mlon}${malt ? `,${malt}` : ''};u=${macc}`,
+              body: `https://www.openstreetmap.org/?mlat=${mlat}&mlon=${mlon}#map=16/${mlat}/${mlon}"`,
+            } as any);
+          }
+
+          function error(err: any) {
+            let response = `Unable to retrieve the location data, Error no. ${err.code}: ${err.message}`;
+            if (err.code === 1) response = 'You have denied Sable access to you location services.';
+            if (err.code === 2)
+              response = 'Your device does not have a gps module, or it may not be turned on.';
+            sendFeedback(response, room, mx.getSafeUserId());
+          }
+          navigator.geolocation.getCurrentPosition(success, error, options);
+        },
+      },
     }),
     [
       mx,
@@ -1437,6 +1576,7 @@ export const useCommands = (mx: MatrixClient, room: Room): CommandRecord => {
       room,
       profile.displayName,
       profile.avatarUrl,
+      pkitcmdHandler,
       developerTools,
       enableMSC4268CMD,
       openBugReport,
