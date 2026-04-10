@@ -429,6 +429,7 @@ export const startClient = async (mx: MatrixClient, config?: StartClientConfig):
     await mx.startClient({
       lazyLoadMembers: true,
       pollTimeout: FAST_SYNC_POLL_TIMEOUT_MS,
+      threadSupport: true,
     });
     // Attach an ongoing classic-sync observer — equivalent to SlidingSyncManager's
     // onLifecycle listener. Tracks state transitions, initial-sync timing, and errors.
@@ -563,9 +564,6 @@ export const startClient = async (mx: MatrixClient, config?: StartClientConfig):
     pollTimeoutMs: slidingConfig?.pollTimeoutMs ?? SLIDING_SYNC_POLL_TIMEOUT_MS,
   });
   manager.attach();
-  // Begin background spidering so all rooms are eventually indexed.
-  // Not awaited — this runs incrementally in the background.
-  manager.startSpidering(100, 50);
   slidingSyncByClient.set(mx, manager);
   syncTransportByClient.set(mx, {
     transport: 'sliding',
@@ -584,6 +582,7 @@ export const startClient = async (mx: MatrixClient, config?: StartClientConfig):
     await mx.startClient({
       lazyLoadMembers: true,
       slidingSync: manager.slidingSync,
+      threadSupport: true,
     });
   } catch (err) {
     debugLog.error('network', 'Failed to start client with sliding sync', {

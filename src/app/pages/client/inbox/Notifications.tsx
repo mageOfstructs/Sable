@@ -81,6 +81,7 @@ import { UserAvatar } from '$components/user-avatar';
 import { EncryptedContent } from '$features/room/message';
 import { useMentionClickHandler } from '$hooks/useMentionClickHandler';
 import { useSpoilerClickHandler } from '$hooks/useSpoilerClickHandler';
+import { useSettingsLinkBaseUrl } from '$features/settings/useSettingsLinkBaseUrl';
 import { ScreenSize, useScreenSizeContext } from '$hooks/useScreenSize';
 import { BackRouteHandler } from '$components/BackRouteHandler';
 import { useMediaAuthentication } from '$hooks/useMediaAuthentication';
@@ -204,6 +205,7 @@ const useNotificationTimeline = (
 
 type RoomNotificationsGroupProps = {
   room: Room;
+  appBaseUrl: string;
   notifications: INotification[];
   mediaAutoLoad?: boolean;
   urlPreview?: boolean;
@@ -215,6 +217,7 @@ type RoomNotificationsGroupProps = {
 };
 function RoomNotificationsGroupComp({
   room,
+  appBaseUrl,
   notifications,
   mediaAutoLoad,
   urlPreview,
@@ -245,28 +248,41 @@ function RoomNotificationsGroupComp({
   const linkifyOpts = useMemo<LinkifyOpts>(
     () => ({
       ...LINKIFY_OPTS,
-      render: factoryRenderLinkifyWithMention((href) =>
-        renderMatrixMention(
-          mx,
-          room.roomId,
-          href,
-          makeMentionCustomProps(mentionClickHandler),
-          nicknames
-        )
+      render: factoryRenderLinkifyWithMention(
+        appBaseUrl,
+        (href) =>
+          renderMatrixMention(
+            mx,
+            room.roomId,
+            href,
+            makeMentionCustomProps(mentionClickHandler),
+            nicknames
+          ),
+        mentionClickHandler
       ),
     }),
-    [mx, room, mentionClickHandler, nicknames]
+    [appBaseUrl, mx, room, mentionClickHandler, nicknames]
   );
   const htmlReactParserOptions = useMemo<HTMLReactParserOptions>(
     () =>
       getReactCustomHtmlParser(mx, room.roomId, {
+        settingsLinkBaseUrl: appBaseUrl,
         linkifyOpts,
         useAuthentication,
         handleSpoilerClick: spoilerClickHandler,
         handleMentionClick: mentionClickHandler,
         nicknames,
       }),
-    [mx, room, linkifyOpts, mentionClickHandler, spoilerClickHandler, useAuthentication, nicknames]
+    [
+      appBaseUrl,
+      mx,
+      room,
+      linkifyOpts,
+      mentionClickHandler,
+      spoilerClickHandler,
+      useAuthentication,
+      nicknames,
+    ]
   );
 
   const renderMatrixEvent = useMatrixEventRenderer<[IRoomEvent, string, GetContentCallback]>(
@@ -468,6 +484,9 @@ function RoomNotificationsGroupComp({
           const replyEventId = relation?.['m.in_reply_to']?.event_id;
           const threadRootId =
             relation?.rel_type === RelationType.Thread ? relation.event_id : undefined;
+          // doesn't work for encrypted rooms
+          // not a big deal really, don't want to bother with finding the event by id and decrypting
+          const mentions = event.content['m.mentions'];
 
           const memberPowerTag = getMemberPowerTag(event.sender);
           const tagColor = memberPowerTag?.color
@@ -543,6 +562,7 @@ function RoomNotificationsGroupComp({
                     room={room}
                     replyEventId={replyEventId}
                     threadRootId={threadRootId}
+                    mentions={mentions}
                     onClick={handleOpenClick}
                   />
                 )}
@@ -578,6 +598,7 @@ export function Notifications() {
   const [dateFormatString] = useSetting(settingsAtom, 'dateFormatString');
   const screenSize = useScreenSizeContext();
   const mDirects = useAtomValue(mDirectAtom);
+  const appBaseUrl = useSettingsLinkBaseUrl();
 
   const { navigateRoom } = useRoomNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -722,6 +743,7 @@ export function Notifications() {
                       >
                         <RoomNotificationsGroupComp
                           room={groupRoom}
+                          appBaseUrl={appBaseUrl}
                           notifications={group.notifications}
                           mediaAutoLoad={mediaAutoLoad}
                           urlPreview={urlPreview}

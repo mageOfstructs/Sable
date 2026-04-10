@@ -14,7 +14,6 @@ import {
   as,
   config,
 } from 'folds';
-
 import {
   MouseEventHandler,
   MouseEvent,
@@ -35,6 +34,8 @@ import {
   Room,
   Relations,
   RoomPinnedEventsEventContent,
+  MatrixEventEvent,
+  RoomEvent,
 } from '$types/matrix-sdk';
 import classNames from 'classnames';
 import { useAtomValue, useSetAtom } from 'jotai';
@@ -380,15 +381,32 @@ function MessageInternal(
   const mx = useMatrixClient();
   const useAuthentication = useMediaAuthentication();
 
-  const [editVersion, setEditVersion] = useState(0);
+  const [contentVersion, setContentVersion] = useState(0);
 
   useEffect(() => {
-    const onReplaced = () => setEditVersion((v) => v + 1);
-    mEvent.on('Event.replaced' as any, onReplaced);
-    return () => {
-      mEvent.off('Event.replaced' as any, onReplaced);
+    const triggerTimelineRegroup = () => {
+      // A Local Echo update seems to trigger a visual refresh without
+      // scrolling the viewport.
+      room.emit(RoomEvent.LocalEchoUpdated, mEvent, room);
     };
-  }, [mEvent]);
+
+    const onUpdate = () => {
+      setContentVersion((v) => v + 1);
+      triggerTimelineRegroup();
+    };
+
+    if (mEvent.getClearContent()) {
+      setContentVersion((v) => (v === 0 ? 1 : v));
+      triggerTimelineRegroup();
+    }
+
+    mEvent.on(MatrixEventEvent.Decrypted, onUpdate);
+    mEvent.on(MatrixEventEvent.Replaced, onUpdate);
+    return () => {
+      mEvent.off(MatrixEventEvent.Decrypted, onUpdate);
+      mEvent.off(MatrixEventEvent.Replaced, onUpdate);
+    };
+  }, [mEvent, room]);
 
   /**
    * We read the per-message profile from the event content here.
@@ -411,7 +429,7 @@ function MessageInternal(
       | PerMessageProfileBeeperFormat
       | undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mEvent, room, editVersion]);
+  }, [mEvent, room, contentVersion]);
 
   /**
    * We convert the per-message profile from the Beeper format to our internal format here in the message component
@@ -423,8 +441,9 @@ function MessageInternal(
 
   /**
    * boolean to indicate wheather we should indicate to the user that it is a pmp
+   * We want to not show it, when the name is unset, or whitespace only
    */
-  const showPmPInfo = pmp !== undefined;
+  const showPmPInfo = parsedPMPContent?.name && parsedPMPContent.name?.trim() !== '';
   // Profiles and Colors
   const profile = useUserProfile(senderId, room);
   const { color: usernameColor, font: usernameFont } = useSableCosmetics(senderId, room);
@@ -659,6 +678,7 @@ function MessageInternal(
   );
 
   const MSG_CONTENT_STYLE = { maxWidth: '100%' };
+  const isSableFeedback = mEvent.getId()?.startsWith('~sable-feedback-');
 
   const msgContentJSX = (
     <Box
@@ -735,6 +755,31 @@ function MessageInternal(
               <Text size="B300">Delete</Text>
             </Chip>
           )}
+        </Box>
+      )}
+      {isSableFeedback && (
+        <Box className={css.SendStatusRow} alignItems="Center" gap="100">
+          <Icon src={Icons.Info} size="100" />
+          <Text size="T200" priority="300" as="span">
+            Only you can see this.
+          </Text>
+          <Chip
+            type="button"
+            variant="SurfaceVariant"
+            radii="Pill"
+            outlined
+            onClick={(evt: any) => {
+              evt.preventDefault();
+              evt.stopPropagation();
+              const eventId = mEvent.getId();
+              if (eventId) {
+                room.removeEvent(eventId);
+                room.emit(RoomEvent.LocalEchoUpdated, mEvent, room);
+              }
+            }}
+          >
+            <Text size="B300">Dismiss</Text>
+          </Chip>
         </Box>
       )}
     </Box>
@@ -1354,26 +1399,26 @@ export const Event = as<'div', EventProps>(
                         }}
                       >
                         <Menu {...props} ref={ref}>
-                          <MenuItem
-                            size="300"
-                            after={<Icon size="100" src={Icons.ReplyArrow} />}
-                            radii="300"
-                            data-event-id={mEvent.getId()}
-                            onClick={(evt: any) => {
-                              onReplyClick(evt);
-                              closeMenu();
-                            }}
-                          >
-                            <Text
-                              className={css.MessageMenuItemText}
-                              as="span"
-                              size="T300"
-                              truncate
-                            >
-                              Reply
-                            </Text>
-                          </MenuItem>
                           <Box direction="Column" gap="100" className={css.MessageMenuGroup}>
+                            <MenuItem
+                              size="300"
+                              after={<Icon size="100" src={Icons.ReplyArrow} />}
+                              radii="300"
+                              data-event-id={mEvent.getId()}
+                              onClick={(evt: any) => {
+                                onReplyClick(evt);
+                                closeMenu();
+                              }}
+                            >
+                              <Text
+                                className={css.MessageMenuItemText}
+                                as="span"
+                                size="T300"
+                                truncate
+                              >
+                                Reply
+                              </Text>
+                            </MenuItem>
                             {!hideReadReceipts && (
                               <MessageReadReceiptItem room={room} eventId={mEvent.getId() ?? ''} />
                             )}

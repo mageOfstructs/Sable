@@ -1,5 +1,153 @@
 # Sable Client Changelog
 
+## 1.14.0 (2026-04-10)
+
+### Features
+
+* Add support for rendering bundled urls per MSC4095 ([#590](https://github.com/SableClient/Sable/pull/590) by @nushea)
+* Improve code blocks with faster, more accurate syntax highlighting, broader language support, and separate light and dark theme options. ([#576](https://github.com/SableClient/Sable/pull/576) by @hazre)
+* Add statuses to DMs ([#644](https://github.com/SableClient/Sable/pull/644) by @nushea)
+* Add custom DM images and descriptions ([#644](https://github.com/SableClient/Sable/pull/644) by @nushea)
+* Add statuses to Member Tile ([#644](https://github.com/SableClient/Sable/pull/644) by @nushea)
+* Add the ability to set Global Name Colors dependent on the theme (dark/light) ([#656](https://github.com/SableClient/Sable/pull/656) by @nushea)
+* Add a setting to collapse sidebar folders by default. ([#624](https://github.com/SableClient/Sable/pull/624) by @7w1)
+* Add a "Dismiss" button to command response messages. ([#625](https://github.com/SableClient/Sable/pull/625) by @7w1)
+* Update threads: various fixes, browse all room threads, and see live reply counts on messages. ([#564](https://github.com/SableClient/Sable/pull/564) by @Just-Insane)
+* Re-introduced custom HTML formatting for long messages ([#641](https://github.com/SableClient/Sable/pull/641) by @Septicity)
+* You can now share direct links to specific settings, and opening one takes you to the right section and highlights the target option. ([#577](https://github.com/SableClient/Sable/pull/577) by @hazre)
+* Settings now use route-based navigation with improved desktop and mobile behavior, including better back and close handling. ([#577](https://github.com/SableClient/Sable/pull/577) by @hazre)
+
+### Fixes
+
+* Use file name instead of "a voice message" for non-voice audio files. ([#651](https://github.com/SableClient/Sable/pull/651) by @mvanhorn)
+* Constrain bug report modal to viewport height to prevent overflow. ([#652](https://github.com/SableClient/Sable/pull/652) by @mvanhorn)
+* Fix dms navigation not navigating to dms when local storage is messed up. ([#653](https://github.com/SableClient/Sable/pull/653) by @7w1)
+* Fix reply button not capturing editor focus. ([#623](https://github.com/SableClient/Sable/pull/623) by @7w1)
+* Fixes links not being clickable in formatted messages, including messages that use abbreviations. ([#632](https://github.com/SableClient/Sable/pull/632) by @hazre)
+* Fix some zero-width (invisible) names ([#640](https://github.com/SableClient/Sable/pull/640) by @nushea)
+* Fix iOS elastic bounce-back overscroll on the root element. ([#650](https://github.com/SableClient/Sable/pull/650) by @mvanhorn)
+* Fixed the "sticky scrolling" issue in encrypted rooms with many PMP messages. ([#626](https://github.com/SableClient/Sable/pull/626) by @Septicity)
+* Fix blank room timeline when app returns from background. When sliding sync delivers an `initial: true` response for the open room, a `TimelineReset` event now correctly shows skeleton placeholders while events reload instead of leaving an empty view. ([#657](https://github.com/SableClient/Sable/pull/657) by @Just-Insane)
+* Image zooming is now centered on the cursor position ([#602](https://github.com/SableClient/Sable/pull/602) by @mini-bomba)
+* Image zooming is now multiplicative instead of additive, resulting in a consistent "zooming speed". ([#602](https://github.com/SableClient/Sable/pull/602) by @mini-bomba)
+* Image zoom buttons now zoom towards the center of the screen ([#602](https://github.com/SableClient/Sable/pull/602) by @mini-bomba)
+* Right clicks no longer drag images in the viewer. ([#620](https://github.com/SableClient/Sable/pull/620) by @Septicity)
+* Updated Support links to point to https://opencollective.com/sable ([#661](https://github.com/SableClient/Sable/pull/661) by @7w1)
+
+## 1.13.1 (2026-03-30)
+
+### Fixes
+
+* Add youtube shorts support to stop it from crashing sable. ([#578](https://github.com/SableClient/Sable/pull/578) by @nushea)
+* Fix rich-text reply previews and custom-formatted messages so unsafe HTML is filtered more strictly and Matrix colors render correctly. ([#571](https://github.com/SableClient/Sable/pull/571) by @hazre)
+* Fix crash when previewing non-video YouTube URLs (channels, @handles, etc.) that lack query parameters. ([#584](https://github.com/SableClient/Sable/pull/584) by @Just-Insane)
+* fix id handling and id generation for Personas ([#583](https://github.com/SableClient/Sable/pull/583) by @dozro)
+
+## 1.13.0 (2026-03-28)
+
+### Features
+
+* Add ability to click on usernames in member and state events to view user info ([#536](https://github.com/SableClient/Sable/pull/536) by @thundertheidiot)
+* Add black theme ([#437](https://github.com/SableClient/Sable/pull/437) by @Elec3137)
+* added a limited compatibility with `pk;member` commands ([#550](https://github.com/SableClient/Sable/pull/550) by @dozro)
+* Add /location sharing command, and a /sharemylocation command. ([#509](https://github.com/SableClient/Sable/pull/509) by @nushea)
+* added option to use shorthands to send a message with a Persona, for example `✨:test` ([#550](https://github.com/SableClient/Sable/pull/550) by @dozro)
+* Add quick reply keybinds by using <kbd>ctrl</kbd>+<kbd>up</kbd> / <kbd>ctrl</kbd>+<kbd>down</kbd> you can now cycle through the message you are replying to with keybinds ([#524](https://github.com/SableClient/Sable/pull/524) by @CodeF53)
+* Adds a `/html` command to send HTML messages ([#560](https://github.com/SableClient/Sable/pull/560) by @Vespe-r)
+* Add room abbreviations with hover tooltips: moderators define term/definition pairs in room settings; matching terms are highlighted in messages. ([#514](https://github.com/SableClient/Sable/pull/514) by @Just-Insane)
+* Add support for timestamps, playlists and youtube music links for the youtube embeds ([#534](https://github.com/SableClient/Sable/pull/534) by @thundertheidiot)
+* Add settings sync across devices via Matrix account data, with JSON export/import ([#515](https://github.com/SableClient/Sable/pull/515) by @Just-Insane)
+
+### Fixes
+
+* Add detailed error messages to forwarding failures. ([#532](https://github.com/SableClient/Sable/pull/532) by @7w1)
+* Cap unread badge numbers at `1k+`, and something extra :) ([#484](https://github.com/SableClient/Sable/pull/484) by @hazre)
+* Fix scroll-to-bottom after room navigation, timeline pagination reliability, and URL preview deduplication. ([#529](https://github.com/SableClient/Sable/pull/529) by @Just-Insane)
+* Fixes the most recent pmp message in encrypted rooms not consistently rendering the pmp and not grouping with previous pmps. ([#526](https://github.com/SableClient/Sable/pull/526) by @7w1)
+* fixed sending sticker and attachments while having a persona selected ([#525](https://github.com/SableClient/Sable/pull/525) by @dozro)
+* Fix push notifications missing sender/room avatar and showing stale display names when using event_id_only push format. ([#551](https://github.com/SableClient/Sable/pull/551) by @Just-Insane)
+* Sanitize formatted reply previews before rendering to prevent unsafe HTML from being parsed in reply snippets. ([#569](https://github.com/SableClient/Sable/pull/569) by @Just-Insane)
+* Fix broken link to Sliding Sync known issues — now points to SableClient/Sable#39 instead of the old repository. ([#519](https://github.com/SableClient/Sable/pull/519) by @Just-Insane)
+* Fix service worker authenticated media requests returning 401 errors after SW restart or when session data is missing/stale. ([#516](https://github.com/SableClient/Sable/pull/516) by @Just-Insane)
+* rephrased the command describtion for `/usepmp` and made `/usepmp reset` actually reset the room association of the pmp ([#550](https://github.com/SableClient/Sable/pull/550) by @dozro)
+* Fix confusing ui with `Client Side Embeds in Encrypted Rooms` setting ([#535](https://github.com/SableClient/Sable/pull/535) by @thundertheidiot)
+* fix forwarding metadata by removing the `null` value ([#540](https://github.com/SableClient/Sable/pull/540) by @dozro)
+* fix forwarding issue for users on synapse homeservers, by removing the relation ([#558](https://github.com/SableClient/Sable/pull/558) by @dozro)
+* fixed the syntax issues regarding `/addpmp` and `usepmp` (note that the syntax for `/usepmp` has changed) ([#550](https://github.com/SableClient/Sable/pull/550) by @dozro)
+* fix the display of jumbo emojis on messages sent with a persona ([#530](https://github.com/SableClient/Sable/pull/530) by @dozro)
+* Fix sidebar notification badge positioning so unread and unverified counts align consistently. ([#484](https://github.com/SableClient/Sable/pull/484) by @hazre)
+* Use the browser's native compact number formatting for room and member counts. ([#484](https://github.com/SableClient/Sable/pull/484) by @hazre)
+* fix(sentry): scrub percent-encoded Matrix IDs and opaque base64url tokens from Sentry URLs ([#531](https://github.com/SableClient/Sable/pull/531) by @Just-Insane)
+
+### Notes
+
+* new/changed bios will now also be saved in the format MSC4440 expects ([#559](https://github.com/SableClient/Sable/pull/559) by @dozro)
+* moved the setting for filtering pronouns by language from experimental to the appearance setting ([#521](https://github.com/SableClient/Sable/pull/521) by @dozro)
+
+## 1.12.3 (2026-03-24)
+
+### Fixes
+
+* Fixed text autocomplete issues ([#487](https://github.com/SableClient/Sable/pull/487) by @nushea)
+* Fix crash when url contains malformed/dangling uri components. ([#512](https://github.com/SableClient/Sable/pull/512) by @7w1)
+
+## 1.12.2 (2026-03-24)
+
+### Fixes
+
+* Fix standard embed links not rendering. ([#506](https://github.com/SableClient/Sable/pull/506) by @7w1)
+* Added maximum height to state events ([#491](https://github.com/SableClient/Sable/pull/491) by @nushea)
+
+## 1.12.1 (2026-03-24)
+
+### Fixes
+
+* Change cloudflare deploy worker message to something much shorter to avoid char limit. ([#504](https://github.com/SableClient/Sable/pull/504) by @7w1)
+
+## 1.12.0 (2026-03-24)
+
+### Features
+
+* `Ctrl + K` search menu is now context aware and lists the current space's rooms at the top. ([#499](https://github.com/SableClient/Sable/pull/499) by @7w1)
+* Add knocking support when attempting to join a room from the directory, an address, a room mention, or space hierarchy, as well as text command support for knocking. Also improves rendering for knock notifications in rooms. ([#470](https://github.com/SableClient/Sable/pull/470) by @polyjitter)
+* Add Android/iOS PWA-specific icon variants. ([#473](https://github.com/SableClient/Sable/pull/473) by @Septicity)
+* Add support for youtube embeds. ([#497](https://github.com/SableClient/Sable/pull/497) by @thundertheidiot)
+* Add sidebar three dot menu for quick access to related settings ([#474](https://github.com/SableClient/Sable/pull/474) by @wolterkam)
+* Replies that mention the OP are now indicated by the OP username being prefixed with @ ([#465](https://github.com/SableClient/Sable/pull/465) by @mini-bomba)
+* Made pin events show a tally of the messages that are pinned. ([#462](https://github.com/SableClient/Sable/pull/462) by @nushea)
+
+#### Improve multiline composer and voice recording ([#476](https://github.com/SableClient/Sable/pull/476) by @hazre)
+
+- Add a multiline composer layout for longer drafts.
+- Keep the voice recorder between composer actions in multiline mode.
+- Show the recorder inside the composer on mobile while recording.
+- Prevent the composer from expanding when recording starts.
+- Make the recorder footer and waveform fit better across screen sizes.
+- Let interrupted mobile recording gestures still stop correctly.
+- Stabilize wrap detection around edge cases like narrow widths and trailing spaces.
+
+### Fixes
+
+* Added error messages provided by homeserver to unknown login errors. ([#496](https://github.com/SableClient/Sable/pull/496) by @7w1)
+* Ensure new updates always reload the page properly. ([#502](https://github.com/SableClient/Sable/pull/502) by @7w1)
+* Removed the blocked users moved notice from notifications setting page. ([#490](https://github.com/SableClient/Sable/pull/490) by @7w1)
+* Fix recieved encrypted message per-message profiles not triggering rerenders. ([#464](https://github.com/SableClient/Sable/pull/464) by @7w1)
+* Add `.m4a` files as a recognized audio type. ([#472](https://github.com/SableClient/Sable/pull/472) by @henk717)
+* Fix messages disappearing from rooms after reconnects and timeline resets. ([#478](https://github.com/SableClient/Sable/pull/478) by @hazre)
+* Fix Camera being enabled by default even when the client has it off pre joining in browsers that permit the video (Electron/Tauri as examples). ([#485](https://github.com/SableClient/Sable/pull/485) by @Rawrington)
+* Fix cinny-dark-theme link colors being too dark ([#469](https://github.com/SableClient/Sable/pull/469) by @Elec3137)
+* Fix "Default" menu item height in room notification switcher. ([#466](https://github.com/SableClient/Sable/pull/466) by @polyjitter)
+* fix the issue of empty displaynames of a persona, causing an empty fallback message, it will now ommit the fallback, if the name is empty or only consists of whitespace ([#495](https://github.com/SableClient/Sable/pull/495) by @dozro)
+* Fixed an Android issue where recording a voice message with headphones could leave audio stuck in low-quality mode until the app was restarted. ([#476](https://github.com/SableClient/Sable/pull/476) by @hazre)
+* Fixed voice message scrubbing/seeking on Firefox by switching the recorder from WebM (no seek index) to Ogg/Opus. ([#476](https://github.com/SableClient/Sable/pull/476) by @hazre)
+* fixes touchpad zooming behaviour ([#481](https://github.com/SableClient/Sable/pull/481) by @integralfunction)
+* Fixes width mismatch for the call chat view. ([#460](https://github.com/SableClient/Sable/pull/460) by @polyjitter)
+* Fix messages sent from sable showing wrong on other client(s) ([#468](https://github.com/SableClient/Sable/pull/468) by @nushea)
+
+### Documentation
+
+* Updated PR template and CONTRIBUTING.md to add AI disclosure requirement. ([#456](https://github.com/SableClient/Sable/pull/456) by @Rosy-iso)
+
 ## 1.11.1 (2026-03-21)
 
 ### Fixes

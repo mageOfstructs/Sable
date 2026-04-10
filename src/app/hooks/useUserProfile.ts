@@ -7,9 +7,15 @@ import colorMXID from '$utils/colorMXID';
 import { profilesCacheAtom } from '$state/userRoomProfile';
 import { useSetting } from '$state/hooks/settings';
 import { settingsAtom } from '$state/settings';
+import { MSC1767Text } from '$types/matrix/common';
 import { useMatrixClient } from './useMatrixClient';
+import { ThemeKind, useActiveTheme } from './useTheme';
 
 const inFlightProfiles = new Map<string, Promise<any>>();
+
+export type MSC4440Bio = {
+  'm.text': Array<MSC1767Text>;
+};
 
 export type UserProfile = {
   avatarUrl?: string;
@@ -20,6 +26,8 @@ export type UserProfile = {
   status?: string;
   bannerUrl?: string;
   nameColor?: string;
+  nameColorDark?: string;
+  nameColorLight?: string;
   isCat?: boolean;
   hasCats?: boolean;
   extended?: Record<string, any>;
@@ -27,6 +35,7 @@ export type UserProfile = {
 };
 
 const normalizeInfo = (info: any): UserProfile => {
+  const msc4440Bio = info['gay.fomx.biography'] as MSC4440Bio | undefined;
   const knownKeys = new Set([
     'avatar_url',
     'displayname',
@@ -35,9 +44,12 @@ const normalizeInfo = (info: any): UserProfile => {
     'm.tz',
     'moe.sable.app.bio',
     'chat.commet.profile_bio',
+    'gay.fomx.biography',
     'chat.commet.profile_banner',
     'chat.commet.profile_status',
     'moe.sable.app.name_color',
+    'moe.sable.app.name_color_dark_theme',
+    'moe.sable.app.name_color_light_theme',
     'kitty.meow.has_cats',
     'kitty.meow.is_cat',
   ]);
@@ -54,10 +66,15 @@ const normalizeInfo = (info: any): UserProfile => {
     displayName: info.displayname,
     pronouns: info['io.fsky.nyx.pronouns'],
     timezone: info['us.cloke.msc4175.tz'] || info['m.tz'],
-    bio: info['moe.sable.app.bio'] || info['chat.commet.profile_bio'],
+    bio:
+      msc4440Bio?.['m.text']?.[0]?.body ||
+      info['moe.sable.app.bio'] ||
+      info['chat.commet.profile_bio'],
     status: info['chat.commet.profile_status'],
     bannerUrl: info['chat.commet.profile_banner'],
     nameColor: info['moe.sable.app.name_color'],
+    nameColorDark: info['moe.sable.app.name_color_dark_theme'],
+    nameColorLight: info['moe.sable.app.name_color_light_theme'],
     isCat: info['kitty.meow.is_cat'] === true,
     hasCats: info['kitty.meow.has_cats'] === true,
     extended,
@@ -88,13 +105,17 @@ export const useUserProfile = (
   const [renderGlobalColors] = useSetting(settingsAtom, 'renderGlobalNameColors');
   const [renderRoomColors] = useSetting(settingsAtom, 'renderRoomColors');
   const [renderRoomFonts] = useSetting(settingsAtom, 'renderRoomFonts');
+  const themeKind = useActiveTheme().kind;
 
   const userSelector = useMemo(() => selectAtom(profilesCacheAtom, (db) => db[userId]), [userId]);
 
   const cached = useAtomValue(userSelector);
   const setGlobalProfiles = useSetAtom(profilesCacheAtom);
 
-  const needsFetch = !!userId && userId !== 'undefined' && !cached?._fetched;
+  const hasOnlyFetchedMarker =
+    cached?._fetched === true && Object.keys(cached ?? {}).every((key) => key === '_fetched');
+  const needsFetch =
+    !!userId && userId !== 'undefined' && (!cached?._fetched || hasOnlyFetchedMarker);
 
   useEffect(() => {
     if (!needsFetch) return undefined;
@@ -189,12 +210,26 @@ export const useUserProfile = (
       }
     }
     const validGlobalVal = isValidHex(data?.nameColor);
+    const validGlobalValDark = isValidHex(data?.nameColorDark);
+    const validGlobalValLight = isValidHex(data?.nameColorLight);
 
-    const hasGlobalColor = !!validGlobalVal;
-    const validGlobal =
-      (renderGlobalColors || userId === mx.getUserId()) && hasGlobalColor
+    const validGlobalGeneral =
+      (renderGlobalColors || userId === mx.getUserId()) && !!validGlobalVal
         ? validGlobalVal
         : undefined;
+    const validGlobalDark =
+      (renderGlobalColors || userId === mx.getUserId()) &&
+      themeKind === ThemeKind.Dark &&
+      !!validGlobalValDark
+        ? validGlobalValDark
+        : undefined;
+    const validGlobalLight =
+      (renderGlobalColors || userId === mx.getUserId()) &&
+      themeKind === ThemeKind.Light &&
+      !!validGlobalValLight
+        ? validGlobalValLight
+        : undefined;
+    const validGlobal = validGlobalDark ?? validGlobalLight ?? validGlobalGeneral;
     const validLocal = localColor && isValidHex(localColor) ? localColor : undefined;
     const validSpace = spaceColor && isValidHex(spaceColor) ? spaceColor : undefined;
 
@@ -224,13 +259,14 @@ export const useUserProfile = (
     };
   }, [
     cached,
+    initialProfile,
+    mx,
     userId,
     room,
-    mx,
-    legacyUsernameColor,
-    renderGlobalColors,
-    initialProfile,
     renderRoomColors,
     renderRoomFonts,
+    renderGlobalColors,
+    themeKind,
+    legacyUsernameColor,
   ]);
 };
