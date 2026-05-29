@@ -46,7 +46,7 @@ const permittedHtmlTags = [
 
 const permittedTagToAttributes = {
   span: ['data-mx-bg-color', 'data-mx-color', 'data-mx-spoiler', 'data-mx-maths', 'data-md'],
-  a: ['target', 'href', 'data-md'],
+  a: ['href', 'data-md'],
   img: ['width', 'height', 'alt', 'title', 'src', 'data-mx-emoticon'], // data-mx-emoticon is for MSC2545
   ol: ['start', 'data-md'],
   ul: ['data-md'],
@@ -250,7 +250,7 @@ const enforceNestingLimit = (fragment: DocumentFragment): void => {
   collect(fragment, 0);
 
   overlyNestedElements
-    .sort((a, b) => b.depth - a.depth)
+    .toSorted((a, b) => b.depth - a.depth)
     .forEach(({ element }) => {
       if (!element.parentNode) return;
       element.replaceWith(...Array.from(element.childNodes));
@@ -288,33 +288,27 @@ export const sanitizeCustomHtml = (customHtml: string): string => {
 
     if (tagName === 'img' && attrName === INTERNAL_IMG_SRC_ATTR) {
       if (!protectedSources.has(hookEvent.attrValue)) {
-        // eslint-disable-next-line no-param-reassign
         hookEvent.keepAttr = false;
         return;
       }
 
-      // eslint-disable-next-line no-param-reassign
       hookEvent.forceKeepAttr = true;
       return;
     }
 
     if (!tagAllowsAttribute(tagName, attrName)) {
       // DOMPurify exposes attribute decisions by mutating the hook event.
-      // eslint-disable-next-line no-param-reassign
       hookEvent.keepAttr = false;
       return;
     }
 
     const validatedAttrValue = getValidatedAttributeValue(tagName, attrName, hookEvent.attrValue);
     if (validatedAttrValue === undefined) {
-      // eslint-disable-next-line no-param-reassign
       hookEvent.keepAttr = false;
       return;
     }
 
-    // eslint-disable-next-line no-param-reassign
     hookEvent.attrValue = validatedAttrValue;
-    // eslint-disable-next-line no-param-reassign
     hookEvent.forceKeepAttr = true;
   });
 

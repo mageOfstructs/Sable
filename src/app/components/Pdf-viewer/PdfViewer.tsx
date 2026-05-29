@@ -1,7 +1,7 @@
-/* eslint-disable no-param-reassign */
-
-import { FormEventHandler, MouseEventHandler, useEffect, useRef, useState } from 'react';
+import type { FormEventHandler, MouseEventHandler } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
+import type { RectCords } from 'folds';
 import {
   Box,
   Button,
@@ -13,7 +13,6 @@ import {
   Input,
   Menu,
   PopOut,
-  RectCords,
   Scroll,
   Spinner,
   Text,
@@ -45,7 +44,7 @@ export const PdfViewer = as<'div', PdfViewerProps>(
       zoomOut,
       setZoom,
       onPointerDown,
-    } = useImageGestures(true, 0.2);
+    } = useImageGestures(true, 0.2, 0.1, 5);
 
     const [pdfJSState, loadPdfJS] = usePdfJSLoader();
     const [docState, loadPdfDocument] = usePdfDocumentLoader(

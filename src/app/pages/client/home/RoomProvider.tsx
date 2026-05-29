@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { useSelectedRoom } from '$hooks/router/useSelectedRoom';
 import { IsDirectRoomProvider, RoomProvider } from '$hooks/useRoom';
@@ -6,9 +6,12 @@ import { useMatrixClient } from '$hooks/useMatrixClient';
 import { JoinBeforeNavigate } from '$features/join-before-navigate';
 import { useSearchParamsViaServers } from '$hooks/router/useSearchParamsViaServers';
 import { useHomeRooms } from './useHomeRooms';
+import { useSetting } from '$state/hooks/settings';
+import { settingsAtom } from '$state/settings';
 
 export function HomeRouteRoomProvider({ children }: { children: ReactNode }) {
   const mx = useMatrixClient();
+  const [isShowingAllRoomsInHome] = useSetting(settingsAtom, 'isShowingAllRoomsInHome');
   const rooms = useHomeRooms();
 
   const { roomIdOrAlias: encodedRoomIdOrAlias, eventId: encodedEventId } = useParams();
@@ -18,7 +21,7 @@ export function HomeRouteRoomProvider({ children }: { children: ReactNode }) {
   const roomId = useSelectedRoom();
   const room = mx.getRoom(roomId);
 
-  if (!room || !rooms.includes(room.roomId)) {
+  if (!room || (!isShowingAllRoomsInHome && !rooms.includes(room.roomId))) {
     return (
       <JoinBeforeNavigate
         roomIdOrAlias={roomIdOrAlias!}
